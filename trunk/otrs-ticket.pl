@@ -16,10 +16,10 @@
 # systems or the command-line.
 #
 # Centreon->Configuration->Commands->Notifications->host-notify-otrs-ticket:
-#	$USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --event_id="$HOSTEVENTID$" --event_id_last="$LASTHOSTEVENTID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTNAME$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEACKAUTHOR$ $SERVICEACKCOMMENT$" --event_state="$HOSTSTATE$" --event_output="$HOSTOUTPUT$"
+#	$USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --notif_id="$HOSTNOTIFICATIONID$" --notif_number="$HOSTNOTIFICATIONNUMBER$" --event_id="$HOSTEVENTID$" --event_id_last="$LASTHOSTEVENTID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTNAME$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEACKAUTHOR$ $SERVICEACKCOMMENT$" --event_state="$HOSTSTATE$" --event_output="$HOSTOUTPUT$"
 #
 # Centreon->Configuration->Commands->Notifications->notify-otrs-ticket:
-#	 $USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --event_id="$SERVICEEVENTID$" --event_id_last="$LASTSERVICEID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTALIAS$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEDESC$" --event_state="$SERVICESTATE$" --event_output="$SERVICEOUTPUT$"
+#	 $USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --notif_id="$SERVICENOTIFICATIONID$" --notif_number="$SERVICENOTIFICATIONNUMBER$" --event_id="$SERVICEEVENTID$" --event_id_last="$LASTSERVICEID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTALIAS$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEDESC$" --event_state="$SERVICESTATE$" --event_output="$SERVICEOUTPUT$"
 
 use strict;
 use Socket;
@@ -56,20 +56,23 @@ my %otrs_defaults = (
 
 # read command line options
 my %opt = ();
-GetOptions(\%opt, 'otrs_user=s', 'otrs_pass=s', 'otrs_server=s', 'event_id=s',
-'event_id_last=s', 'event_type=s', 'event_date=s', 'event_host=s',
-'event_addr=s', 'event_desc=s', 'event_state=s', 'event_output=s',
-'otrs_customer=s', 'otrs_queue=s', 'otrs_priority=s', 'otrs_type=s',
-'otrs_state=s', 'otrs_service=s', 'verbose');
+GetOptions(\%opt, 'verbose', 'otrs_user=s', 'otrs_pass=s', 'otrs_server=s',
+'event_id=s', 'event_id_last=s', 'event_type=s', 'event_date=s',
+'event_host=s', 'event_addr=s', 'event_desc=s', 'event_state=s',
+'event_output=s', 'otrs_customer=s', 'otrs_queue=s', 'otrs_priority=s',
+'otrs_type=s', 'otrs_state=s', 'otrs_service=s', 'notif_id=s',
+'notif_number=s');
 
 # silently strip anything non-numeric from integer fields (where-as
 # GetOptions's '=i' would throw an error)
-for ( qw( event_id event_id_last ) ) { $opt{$_} =~ s/[^0-9]// if (defined $opt{$_}); }
+for ( qw( event_id event_id_last notif_id notif_number ) ) { 
+	$opt{$_} =~ s/[^0-9]// if (defined $opt{$_});
+}
 
 # beautify some option names for logging, ticket text, etc.
 my %event_info = (
-	'EventID' => $opt{'event_id'} ||= '',
-	'EventIDLast' => $opt{'event_id_last'} ||= '',
+	'EventID' => $opt{'event_id'} ||= 0,
+	'EventIDLast' => $opt{'event_id_last'} ||= 0,
 	'EventType' => $opt{'event_type'} ||= '',
 	'EventDate' => $opt{'event_date'} ||= '',
 	'EventHostName' => $opt{'event_host'} ||= '',
@@ -77,9 +80,11 @@ my %event_info = (
 	'EventServiceDesc' => $opt{'event_desc'} ||= '',
 	'EventState' => $opt{'event_state'} ||= '',
 	'EventOutput' => $opt{'event_output'} ||= '',
+	'NotificationID' => $opt{'notif_id'} ||= 0,
+	'NotificationNumber' => $opt{'notif_number'} ||= 0,
 );
 
-if (defined $opt{'event_id'} && $opt{'event_id'} == 0 
+if (defined $opt{'event_id'} && $opt{'event_id'} == 0
 	&& defined $opt{'event_id_last'} && $opt{'event_id_last'} > 0) {
 	$opt{'event_id'} = $opt{'event_id_last'};
 	$opt{'otrs_state'} = $state_on_last 
