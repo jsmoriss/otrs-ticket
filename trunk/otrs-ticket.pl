@@ -22,13 +22,14 @@
 #	 $USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --event_id="$SERVICEEVENTID$" --event_id_last="$LASTSERVICEID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTALIAS$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEDESC$" --event_state="$SERVICESTATE$" --event_output="$SERVICEOUTPUT$"
 
 use strict;
+use Socket;
 use Getopt::Long;
 use DBI;
 use DBD::SQLite;
 use SOAP::Lite;
 use Log::Handler;
 
-my $VERSION = '1.0';
+my $VERSION = '1.1';
 
 # hard-code paths to prevent warning from taint mode
 my $logfile = '/var/tmp/otrs-ticket.log';
@@ -58,20 +59,17 @@ my %opt = ();
 GetOptions(\%opt, 'otrs_user=s', 'otrs_pass=s', 'otrs_server=s', 'event_id=s',
 'event_id_last=s', 'event_type=s', 'event_date=s', 'event_host=s',
 'event_addr=s', 'event_desc=s', 'event_state=s', 'event_output=s',
-'otrs_customer=s', 'otrs_queue=s', 'otrs_prio=s', 'otrs_type=s',
+'otrs_customer=s', 'otrs_queue=s', 'otrs_priority=s', 'otrs_type=s',
 'otrs_state=s', 'otrs_service=s', 'verbose');
 
-if (defined $opt{'event_id'} && $opt{'event_id'} == 0 
-	&& defined $opt{'event_id_last'} && $opt{'event_id_last'} > 0) {
-
-	$opt{'event_id'} = $opt{'event_id_last'};
-	$opt{'otrs_state'} = $state_on_last 
-		if ($state_on_last && !$opt{'otrs_state'});
-}
+# silently strip anything non-numeric from integer fields (where-as
+# GetOptions's '=i' would throw an error)
+for ( qw( event_id event_id_last ) ) { $opt{$_} =~ s/[^0-9]// if (defined $opt{$_}); }
 
 # beautify some option names for logging, ticket text, etc.
 my %event_info = (
 	'EventID' => $opt{'event_id'} ||= '',
+	'EventIDLast' => $opt{'event_id_last'} ||= '',
 	'EventType' => $opt{'event_type'} ||= '',
 	'EventDate' => $opt{'event_date'} ||= '',
 	'EventHostName' => $opt{'event_host'} ||= '',
@@ -80,6 +78,13 @@ my %event_info = (
 	'EventState' => $opt{'event_state'} ||= '',
 	'EventOutput' => $opt{'event_output'} ||= '',
 );
+
+if (defined $opt{'event_id'} && $opt{'event_id'} == 0 
+	&& defined $opt{'event_id_last'} && $opt{'event_id_last'} > 0) {
+	$opt{'event_id'} = $opt{'event_id_last'};
+	$opt{'otrs_state'} = $state_on_last 
+		if ($state_on_last && !$opt{'otrs_state'});
+}
 
 my $stdout = $opt{'verbose'} ? 'debug' : 'info';
 my $log = Log::Handler->new();
@@ -103,7 +108,7 @@ $log->info("START of $0 v$VERSION script");
 # arguments might be missing).
 #
 $log->debug("Saving event_info fields to $csvfile.");
-unless (open (CSV, ">>$csvfile")) { $log->critical("Error opening ".$csvfile.": ".$!); exit 1; }
+unless (open (CSV, ">>$csvfile")) { $log->critical("Error opening ".$csvfile.": ".$!); &DoExit(1); }
 unless (-s $csvfile) { for (sort keys %event_info) { print CSV '"', $_, '",'; }; print CSV "\n"; }
 for (sort keys %event_info) { print CSV '"', $event_info{$_}, '",'; }; print CSV "\n";
 close (CSV);
@@ -119,7 +124,7 @@ for (@essential_opts) {
 	$log->error("Required argument $_ not defined or empty!") 
 		if (!defined $opt{$_} || $opt{$_} eq '');
 }
-for (@essential_opts) { exit 1 if (! $opt{$_}); }
+for (@essential_opts) { &DoExit(1) if (! $opt{$_}); }
 
 for (sort keys %opt) {
 	if ($_ eq 'otrs_pass' ) { $log->debug("Argument $_ = ********") }
@@ -131,7 +136,7 @@ for (sort keys %opt) {
 #
 my $dsn = "DBI:SQLite:dbname=$dbname";
 my $dbh = DBI->connect($dsn, $dbuser, $dbpass);
-if ($DBI::err) { $log->critical($DBI::errstr); exit 1; }
+if ($DBI::err) { $log->critical($DBI::errstr); &DoExit(1); }
 
 $dbh->do("PRAGMA foreign_keys = ON");
 $dbh->do("CREATE TABLE IF NOT EXISTS $dbtable ( 
@@ -215,15 +220,15 @@ if ($TicketID) {
 	$otrs{'Operation'} = 'TicketCreate';
 	%ticket = (
 		'Queue' => $opt{'otrs_queue'} ||= $otrs_defaults{'Queue'},
-		'PriorityID' => $opt{'otrs_prio'} ||= $otrs_defaults{'PriorityID'},
+		'PriorityID' => $opt{'otrs_priority'} ||= $otrs_defaults{'PriorityID'},
 		'Type' => $opt{'otrs_type'} ||= $otrs_defaults{'Type'},
 		'State' => $opt{'otrs_state'} ||= $otrs_defaults{'State'},
 		'Service' => $opt{'otrs_service'} ||= $otrs_defaults{'Service'},
 		'DynamicField' => {
-			'EventID' => $event_info{'EventID'},
-			'EventHostName' => $event_info{'EventHostName'},
-			'EventHostAddress' => $event_info{'EventHostAddress'},
-			'EventServiceDesc' => $event_info{'EventServiceDesc'},
+			'EventID' => $opt{'event_id'},
+			'EventHostName' => $opt{'event_host'},
+			'EventHostAddress' => $opt{'event_addr'},
+			'EventServiceDesc' => $opt{'event_desc'},
 		},
 	);
 }
@@ -232,9 +237,9 @@ if ($TicketID) {
 $ticket{'CustomerUser'} = $opt{'otrs_customer'} ||= $otrs_defaults{'CustomerUser'};
 $ticket{'ContentType'} = 'text/plain; charset=utf8';
 $ticket{'SenderType'} = 'system';
-$ticket{'Title'} = "$event_info{'EventType'}: $event_info{'EventHostName'}/$event_info{'EventServiceDesc'} is $event_info{'EventState'}";
+$ticket{'Title'} = "$opt{'event_type'}: $opt{'event_host'}/$opt{'event_desc'} is $opt{'event_state'}";
 $ticket{'Subject'} = $ticket{'Title'};
-$ticket{'Body'} = $event_info{'EventOutput'}."\n\n";
+$ticket{'Body'} = $opt{'event_output'}."\n\n";
 
 # Append all the "event_info" fields to the ticket for reference.
 for (sort keys %event_info) { $ticket{'Body'} .= "$_ = $event_info{$_}\n"; }
@@ -270,9 +275,14 @@ for ( sort keys %{$ticket{'DynamicField'}} ) {
 	}
 }
 
+if ($opt{'otrs_server'} =~ /^([^:]*)/) {
+	my $ip_nbo = inet_aton($1);
+	if (!$ip_nbo) { $log->critical("Failed to resolve IP of ".$1); &DoExit(1); }
+	$log->info( "OTRS Server is ".$opt{'otrs_server'}." (".inet_ntoa($ip_nbo).")" );
+}
 
-my $SOAPOperation = $otrs{'Operation'}; $log->info("SOAP $SOAPOperation at ".$otrs{'URL'});
-my $SOAPObject = SOAP::Lite->uri($otrs{'NameSpace'})->proxy($otrs{'URL'})->$SOAPOperation(
+my $soap_op = $otrs{'Operation'}; $log->info("SOAP $soap_op at ".$otrs{'URL'});
+my $soap_obj = SOAP::Lite->uri($otrs{'NameSpace'})->proxy($otrs{'URL'})->$soap_op(
 	SOAP::Data->name('UserLogin')->value($otrs{'UserLogin'}),
     	SOAP::Data->name('Password')->value($otrs{'Password'}),
     	SOAP::Data->name('TicketID')->value($otrs{'TicketID'}),
@@ -282,15 +292,12 @@ my $SOAPObject = SOAP::Lite->uri($otrs{'NameSpace'})->proxy($otrs{'URL'})->$SOAP
 	SOAP::Data->type('xml'=> $DynamicFieldXML),
 );
 
-if ( $SOAPObject->fault ) {
-	$log->critical($SOAPObject->faultcode.": ".$SOAPObject->faultstring);
-	exit 1;
-}
+if ( $soap_obj->fault ) { $log->critical($soap_obj->faultcode.": ".$soap_obj->faultstring); &DoExit(1); }
 
 $log->info("SOAP transaction successful");
 
 # get the XML response part from the SOAP message
-my $XMLResponse = $SOAPObject->context()->transport()->proxy()->http_response()->content();
+my $XMLResponse = $soap_obj->context()->transport()->proxy()->http_response()->content();
 
 # deserialize response (convert it into a perl structure)
 my $Deserialized = eval { SOAP::Deserializer->deserialize($XMLResponse); };
@@ -305,7 +312,7 @@ my $Response = $Body->{'TicketCreateResponse'} ?
 if (defined $Body->{$Response}->{Error}) {
 	$log->error("Error found in $Response");
 	$log->error($Body->{$Response}->{Error}->{ErrorCode}." = ".$Body->{$Response}->{Error}->{ErrorMessage});
-	exit 1;
+	&DoExit(1);
 }
 
 $TicketID = $Body->{$Response}->{TicketID};
@@ -322,6 +329,11 @@ else {
 	$sth->execute($opt{'event_id'}, $TicketID, $TicketNumber);
 }
 
-$log->info("END of $0 v$VERSION script");
+&DoExit(0);
 
-exit 0;
+sub DoExit {
+	my ($err) = @_;
+	$log->info("END of $0 v$VERSION script");
+	exit $err;
+}
+
