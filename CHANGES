@@ -1,0 +1,6 @@
+
+Version 1.1
+
+	- Added inet_aton/inet_ntoa function calls to resolve OTRS server IP
+	  before launching SOAP (just to make sure the resolver works).
+
