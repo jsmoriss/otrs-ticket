@@ -16,10 +16,10 @@
 # systems or the command-line.
 #
 # Centreon->Configuration->Commands->Notifications->host-notify-otrs-ticket:
-#	$USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --notif_id="$HOSTNOTIFICATIONID$" --notif_number="$HOSTNOTIFICATIONNUMBER$" --event_id="$HOSTEVENTID$" --event_id_last="$LASTHOSTEVENTID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTNAME$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEACKAUTHOR$ $SERVICEACKCOMMENT$" --event_state="$HOSTSTATE$" --event_output="$HOSTOUTPUT$"
+#	$USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --notif_id="$HOSTNOTIFICATIONID$" --notif_number="$HOSTNOTIFICATIONNUMBER$" --event_id="$HOSTPROBLEMID$" --event_id_last="$LASTHOSTPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTNAME$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEACKAUTHOR$ $SERVICEACKCOMMENT$" --event_state="$HOSTSTATE$" --event_output="$HOSTOUTPUT$"
 #
 # Centreon->Configuration->Commands->Notifications->notify-otrs-ticket:
-#	 $USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --notif_id="$SERVICENOTIFICATIONID$" --notif_number="$SERVICENOTIFICATIONNUMBER$" --event_id="$SERVICEEVENTID$" --event_id_last="$LASTSERVICEID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTALIAS$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEDESC$" --event_state="$SERVICESTATE$" --event_output="$SERVICEOUTPUT$"
+#	 $USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --notif_id="$SERVICENOTIFICATIONID$" --notif_number="$SERVICENOTIFICATIONNUMBER$" --event_id="$SERVICEPROBLEMID$" --event_id_last="$LASTSERVICEPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTALIAS$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEDESC$" --event_state="$SERVICESTATE$" --event_output="$SERVICEOUTPUT$"
 
 use strict;
 use Socket;
@@ -38,9 +38,8 @@ my $dbname = '/var/tmp/otrs-ticket.sqlite';
 my $dbuser = '';
 my $dbpass = '';
 my $dbtable = 'TicketIDAssoc';
-# set $state_on_last to 'closed successful' (for example) to close tickets
-# when service returns (Centreon / Nagios passed the $LASTEVENTID$ or
-# $LASTSERVICEID$ argument)
+# set $state_on_last to 'closed successful' (or 'resolved' for example) to
+# close tickets when service returns.
 my $state_on_last = '';
 my $TicketID;
 my $TicketNumber;
