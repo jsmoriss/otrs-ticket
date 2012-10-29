@@ -63,7 +63,7 @@ GetOptions(\%opt, 'verbose', 'otrs_user=s', 'otrs_pass=s', 'otrs_server=s',
 'notif_number=s');
 
 # silently strip anything non-numeric from integer fields (where-as
-# GetOptions's '=i' would throw an error)
+# using GetOptions's '=i' would throw an error)
 for ( qw( event_id event_id_last notif_id notif_number ) ) { 
 	$opt{$_} =~ s/[^0-9]// if (defined $opt{$_});
 }
