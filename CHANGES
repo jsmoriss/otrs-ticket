@@ -1,13 +1,14 @@
 
 Version 1.2
 
-	- Renamed the --event_id and --event_id_last options to --problem_id
-	  and --problem_id_last.
+- Renamed the event_id and event_id_last options to problem_id and
+  problem_id_last.
+- Added %otrs_states to change ticket state depending on the event_type value.
 
 Version 1.1
 
-	- Added inet_aton/inet_ntoa function calls to resolve OTRS server IP
-	  before launching SOAP (just to make sure the resolver works).
-	- Added --notif_id and --notif_number command line argument.
-	- Renamed Nagios *EVENTID variables to *PROBLEMID.
+- Added inet_aton/inet_ntoa function calls to resolve OTRS server IP before
+  launching SOAP (just to make sure the resolver works).
+- Added --notif_id and --notif_number command line argument.
+- Renamed Nagios *EVENTID variables to *PROBLEMID.
 

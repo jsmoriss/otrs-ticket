@@ -20,7 +20,16 @@
 #
 # Centreon->Configuration->Commands->Notifications->notify-otrs-ticket:
 #	 $USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --problem_id="$SERVICEPROBLEMID$" --problem_id_last="$LASTSERVICEPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTALIAS$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEDESC$" --event_state="$SERVICESTATE$" --event_output="$SERVICEOUTPUT$"
-
+#
+# OTRS requirements:
+#
+# 1) A user name and password to create tickets.
+# 2) A UNIX ticket queue (see %otrs_defaults variable).
+# 3) An 'unknown' customer username (see %otrs_defaults variable).
+# 4) A state named 'recovered' (see %otrs_states variable).
+# 5) Services 'Infrastructure::Server::Unix/Linux' (see %otrs_defaults variable).
+# 6) Dynamic fields : ProblemID, HostName, HostAddress, ServiceDesc.
+#
 use strict;
 use Socket;
 use Getopt::Long;
@@ -38,12 +47,11 @@ my $dbname = '/var/tmp/otrs-ticket.sqlite';
 my $dbuser = '';
 my $dbpass = '';
 my $dbtable = 'TicketIDAssoc';
-# set $state_on_last to 'closed successful' (or 'resolved' for example) to
-# close tickets when service returns.
-my $state_on_last = '';
-my $TicketID;
-my $TicketNumber;
-my $ArticleID;
+# if the event_type is known, then change the ticket state
+my %otrs_states = (
+	'ACKNOWLEDGEMENT' => 'open',
+	'RECOVERY' => 'recovered',
+);
 my %otrs_defaults = (
 	'Queue' => 'UNIX',
 	'PriorityID' => '3',
@@ -52,6 +60,9 @@ my %otrs_defaults = (
 	'CustomerUser' => 'unknown',
 	'Service' => 'Infrastructure::Server::Unix/Linux',
 );
+my $TicketID;
+my $TicketNumber;
+my $ArticleID;
 
 # read command line options
 my %opt = ();
@@ -83,9 +94,14 @@ my %event_info = (
 if (defined $opt{'problem_id'} && $opt{'problem_id'} == 0
 	&& defined $opt{'problem_id_last'} && $opt{'problem_id_last'} > 0) {
 	$opt{'problem_id'} = $opt{'problem_id_last'};
-	$opt{'otrs_state'} = $state_on_last 
-		if ($state_on_last && !$opt{'otrs_state'});
 }
+
+# define a new ticket state if one wasn't given on the command line, and the
+# event_type has been defined in %otrs_states.
+$opt{'otrs_state'} = $otrs_states{$opt{'event_type'}}
+	if ( !$opt{'otrs_state'} 
+		&& defined $otrs_states{$opt{'event_type'}}
+		&& $otrs_states{$opt{'event_type'}} );
 
 my $stdout = $opt{'verbose'} ? 'debug' : 'info';
 my $log = Log::Handler->new();
@@ -227,9 +243,9 @@ if ($TicketID) {
 		'Service' => $opt{'otrs_service'} ||= $otrs_defaults{'Service'},
 		'DynamicField' => {
 			'ProblemID' => $opt{'problem_id'},
-			'EventHostName' => $opt{'event_host'},
-			'EventHostAddress' => $opt{'event_addr'},
-			'EventServiceDesc' => $opt{'event_desc'},
+			'HostName' => $opt{'event_host'},
+			'HostAddress' => $opt{'event_addr'},
+			'ServiceDesc' => $opt{'event_desc'},
 		},
 	);
 }
