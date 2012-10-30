@@ -16,10 +16,10 @@
 # systems or the command-line.
 #
 # Centreon->Configuration->Commands->Notifications->host-notify-otrs-ticket:
-#	$USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --notif_id="$HOSTNOTIFICATIONID$" --notif_number="$HOSTNOTIFICATIONNUMBER$" --event_id="$HOSTPROBLEMID$" --event_id_last="$LASTHOSTPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTNAME$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEACKAUTHOR$ $SERVICEACKCOMMENT$" --event_state="$HOSTSTATE$" --event_output="$HOSTOUTPUT$"
+#	$USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --problem_id="$HOSTPROBLEMID$" --problem_id_last="$LASTHOSTPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTNAME$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEACKAUTHOR$ $SERVICEACKCOMMENT$" --event_state="$HOSTSTATE$" --event_output="$HOSTOUTPUT$"
 #
 # Centreon->Configuration->Commands->Notifications->notify-otrs-ticket:
-#	 $USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --notif_id="$SERVICENOTIFICATIONID$" --notif_number="$SERVICENOTIFICATIONNUMBER$" --event_id="$SERVICEPROBLEMID$" --event_id_last="$LASTSERVICEPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTALIAS$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEDESC$" --event_state="$SERVICESTATE$" --event_output="$SERVICEOUTPUT$"
+#	 $USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --problem_id="$SERVICEPROBLEMID$" --problem_id_last="$LASTSERVICEPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTALIAS$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEDESC$" --event_state="$SERVICESTATE$" --event_output="$SERVICEOUTPUT$"
 
 use strict;
 use Socket;
@@ -29,7 +29,7 @@ use DBD::SQLite;
 use SOAP::Lite;
 use Log::Handler;
 
-my $VERSION = '1.1';
+my $VERSION = '1.2';
 
 # hard-code paths to prevent warning from taint mode
 my $logfile = '/var/tmp/otrs-ticket.log';
@@ -56,22 +56,21 @@ my %otrs_defaults = (
 # read command line options
 my %opt = ();
 GetOptions(\%opt, 'verbose', 'otrs_user=s', 'otrs_pass=s', 'otrs_server=s',
-'event_id=s', 'event_id_last=s', 'event_type=s', 'event_date=s',
+'problem_id=s', 'problem_id_last=s', 'event_type=s', 'event_date=s',
 'event_host=s', 'event_addr=s', 'event_desc=s', 'event_state=s',
 'event_output=s', 'otrs_customer=s', 'otrs_queue=s', 'otrs_priority=s',
-'otrs_type=s', 'otrs_state=s', 'otrs_service=s', 'notif_id=s',
-'notif_number=s');
+'otrs_type=s', 'otrs_state=s', 'otrs_service=s');
 
 # silently strip anything non-numeric from integer fields (where-as
 # using GetOptions's '=i' would throw an error)
-for ( qw( event_id event_id_last notif_id notif_number ) ) { 
+for ( qw( problem_id problem_id_last ) ) { 
 	$opt{$_} =~ s/[^0-9]// if (defined $opt{$_});
 }
 
 # beautify some option names for logging, ticket text, etc.
 my %event_info = (
-	'EventID' => $opt{'event_id'} ||= 0,
-	'EventIDLast' => $opt{'event_id_last'} ||= 0,
+	'ProblemID' => $opt{'problem_id'} ||= 0,
+	'ProblemIDLast' => $opt{'problem_id_last'} ||= 0,
 	'EventType' => $opt{'event_type'} ||= '',
 	'EventDate' => $opt{'event_date'} ||= '',
 	'EventHostName' => $opt{'event_host'} ||= '',
@@ -79,13 +78,11 @@ my %event_info = (
 	'EventServiceDesc' => $opt{'event_desc'} ||= '',
 	'EventState' => $opt{'event_state'} ||= '',
 	'EventOutput' => $opt{'event_output'} ||= '',
-	'NotificationID' => $opt{'notif_id'} ||= 0,
-	'NotificationNumber' => $opt{'notif_number'} ||= 0,
 );
 
-if (defined $opt{'event_id'} && $opt{'event_id'} == 0
-	&& defined $opt{'event_id_last'} && $opt{'event_id_last'} > 0) {
-	$opt{'event_id'} = $opt{'event_id_last'};
+if (defined $opt{'problem_id'} && $opt{'problem_id'} == 0
+	&& defined $opt{'problem_id_last'} && $opt{'problem_id_last'} > 0) {
+	$opt{'problem_id'} = $opt{'problem_id_last'};
 	$opt{'otrs_state'} = $state_on_last 
 		if ($state_on_last && !$opt{'otrs_state'});
 }
@@ -120,7 +117,7 @@ close (CSV);
 #
 # Check all essential opt values and exit if some missing.
 #
-my @essential_opts = sort qw( otrs_user otrs_pass otrs_server event_id event_type
+my @essential_opts = sort qw( otrs_user otrs_pass otrs_server problem_id event_type
 event_date event_host event_addr event_state event_output );
 
 # print the whole list before exiting
@@ -144,11 +141,11 @@ if ($DBI::err) { $log->critical($DBI::errstr); &DoExit(1); }
 
 $dbh->do("PRAGMA foreign_keys = ON");
 $dbh->do("CREATE TABLE IF NOT EXISTS $dbtable ( 
-	EventID INTEGER PRIMARY KEY, 
+	ProblemID INTEGER PRIMARY KEY, 
 	TicketID INTEGER NOT NULL, 
 	TicketNumber INTEGER )");
 ($TicketID, $TicketNumber) = $dbh->selectrow_array("SELECT TicketID, TicketNumber 
-	FROM $dbtable WHERE EventID=?", undef, $opt{'event_id'});
+	FROM $dbtable WHERE ProblemID=?", undef, $opt{'problem_id'});
 
 #
 # Configuration for OTRS connection and definition of available Ticket /
@@ -209,7 +206,7 @@ my %otrs = (
 #
 my %ticket;
 if ($TicketID) {
-	$log->info("Found EventID $opt{'event_id'} in database");
+	$log->info("Found ProblemID $opt{'problem_id'} in database");
 	$log->info("Updating TicketID $TicketID (TicketNumber $TicketNumber)");
 	$otrs{'Operation'} = 'TicketUpdate';
 	$otrs{'TicketID'} = $TicketID;
@@ -219,8 +216,8 @@ if ($TicketID) {
 		$log->notice('Updating Ticket State to "'.$ticket{'State'}.'"');
 	}
 } else {
-	$log->debug("EventID ".$opt{'event_id'}." not found in database");
-	$log->info("Creating new OTRS Ticket for EventID ".$opt{'event_id'});
+	$log->debug("ProblemID ".$opt{'problem_id'}." not found in database");
+	$log->info("Creating new OTRS Ticket for ProblemID ".$opt{'problem_id'});
 	$otrs{'Operation'} = 'TicketCreate';
 	%ticket = (
 		'Queue' => $opt{'otrs_queue'} ||= $otrs_defaults{'Queue'},
@@ -229,7 +226,7 @@ if ($TicketID) {
 		'State' => $opt{'otrs_state'} ||= $otrs_defaults{'State'},
 		'Service' => $opt{'otrs_service'} ||= $otrs_defaults{'Service'},
 		'DynamicField' => {
-			'EventID' => $opt{'event_id'},
+			'ProblemID' => $opt{'problem_id'},
 			'EventHostName' => $opt{'event_host'},
 			'EventHostAddress' => $opt{'event_addr'},
 			'EventServiceDesc' => $opt{'event_desc'},
@@ -328,9 +325,9 @@ my $ticket_sum = "TicketID $TicketID (TicketNumber $TicketNumber, ArticleID $Art
 if ($Response eq 'TicketUpdateResponse') { $log->info("Updated $ticket_sum"); }
 else {
 	$log->info("Created $ticket_sum");
-	$log->info("Adding TicketID $TicketID and EventID $opt{'event_id'} to $dbname");
+	$log->info("Adding TicketID $TicketID and ProblemID $opt{'problem_id'} to $dbname");
 	my $sth = $dbh->prepare("INSERT INTO $dbtable VALUES ( ?, ?, ? )");
-	$sth->execute($opt{'event_id'}, $TicketID, $TicketNumber);
+	$sth->execute($opt{'problem_id'}, $TicketID, $TicketNumber);
 }
 
 &DoExit(0);
