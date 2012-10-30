@@ -1,4 +1,9 @@
 
+Version 1.2
+
+	- Renamed the --event_id and --event_id_last options to --problem_id
+	  and --problem_id_last.
+
 Version 1.1
 
 	- Added inet_aton/inet_ntoa function calls to resolve OTRS server IP
