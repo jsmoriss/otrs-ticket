@@ -9,10 +9,12 @@ OTRS configuration options for the otrs-ticket.pl script.
  # A user login (aka "Agent") must be created in OTRS for the otrs-ticket.pl script (for example: firstname = Centreon, lastname = Monitoring, username = centreon). Use the --otrs_user, --otrs_pass, and --otrs_server command-line options to define the authentication credentials for otrs-ticket.pl.
  # An OTRS queue must be created. The default queue name is "UNIX", as defined in the %otrs_defaults variable within the otrs-ticket.pl code, but can be over-ridden on the command-line with the --otrs_queue parameter. I would recommend that the "Follow up Option" in the OTRS queue be set to "possible" to allow service restoration notifications to update the ticket, even after it has been closed. The otrs-ticket.pl script can also manage any of the other follow-up conditions.
  # Some of the command-line information passed to otrs-ticket.pl is saved as DynamicFields. The following four DynamicFields must be created in OTRS:
+
  ProblemID
  HostName
  HostAddress
  ServiceDesc
+
  # A new State named "recovered" should be created (State type = open, Comment = Service has recovered.). The State can be "open" or "closed" depending on your preference when the service is restored. If you would rather not change states on a RECOVERY event, modify the %otrs_states variable in the otrs-ticket.pl code (removing or adding elements as necessary).
  # If you use the --otrs_customer command-line option, don't forget to create the appropriate customer usernames in OTRS as well.
  # If you use the --otrs_service command-line option, don't forget to create the appropriate services in OTRS first. The default OTRS Service, as defined in the %otrs_defaults variable, is "Infrastructure::Server::Unix/Linux". You might want to change the default, or create these three Service names in OTRS.
