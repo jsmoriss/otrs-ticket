@@ -13,22 +13,23 @@
 # details at http://www.gnu.org/licenses/.
 
 # Create and update OTRS tickets from Centreon, Nagios, other monitoring
-# systems or the command-line.
+# systems, or the command-line.
 #
-# Centreon->Configuration->Commands->Notifications->host-notify-otrs-ticket:
+# Centreon / Nagios Host Notification:
 #	$USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --problem_id="$HOSTPROBLEMID$" --problem_id_last="$LASTHOSTPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTNAME$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEACKAUTHOR$ $SERVICEACKCOMMENT$" --event_state="$HOSTSTATE$" --event_output="$HOSTOUTPUT$"
 #
-# Centreon->Configuration->Commands->Notifications->notify-otrs-ticket:
+# Centreon / Nagios Service Notification:
 #	 $USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --problem_id="$SERVICEPROBLEMID$" --problem_id_last="$LASTSERVICEPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTALIAS$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEDESC$" --event_state="$SERVICESTATE$" --event_output="$SERVICEOUTPUT$"
 #
-# OTRS requirements:
+# Requirements for OTRS:
 #
+# 1) The GenericTicketConnector.yml must be installed.
 # 1) A user name and password to create tickets.
 # 2) A UNIX ticket queue (see %otrs_defaults variable).
 # 3) An 'unknown' customer username (see %otrs_defaults variable).
 # 4) A state named 'recovered' (see %otrs_states variable).
-# 5) Services 'Infrastructure::Server::Unix/Linux' (see %otrs_defaults variable).
-# 6) Dynamic fields : ProblemID, HostName, HostAddress, ServiceDesc.
+# 5) An 'Infrastructure::Server::Unix/Linux' service (see %otrs_defaults variable).
+# 6) Dynamic fields ProblemID, HostName, HostAddress, and ServiceDesc.
 #
 use strict;
 use Socket;
