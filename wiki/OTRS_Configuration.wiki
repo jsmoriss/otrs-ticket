@@ -1,0 +1,5 @@
+= Introduction =
+
+Required OTRS configuration options for the otrs-ticket.pl script.
+
+= Details =
