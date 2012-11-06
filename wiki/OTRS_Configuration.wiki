@@ -17,6 +17,6 @@ ServiceDesc
 }}}
  # A new State named "recovered" should be created (State type = open, Comment = Service has recovered.). The State type can be "open" or "closed" depending on your preference when the service is restored. If you would rather not change states on a RECOVERY event, modify the %otrs_states variable in the otrs-ticket.pl code (removing or adding elements as necessary).
  # If you use the --otrs_customer command-line option, don't forget to create the appropriate customer usernames in OTRS as well.
- # If you use the --otrs_service command-line option, don't forget to create the appropriate services in OTRS first. The default OTRS Service, as defined in the %otrs_defaults variable, is "Infrastructure::Server::Unix/Linux". You might want to change the default, or create these three Service names in OTRS.
+ # If you use the --otrs_service command-line option, don't forget to create the appropriate services in OTRS first. The default OTRS Service, as defined in the %otrs_defaults variable, is "Infrastructure::Server::Unix/Linux". You might want to change the default, or create those three Service names in OTRS.
 
 <g:plusone size="medium"></g:plusone>
