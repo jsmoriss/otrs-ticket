@@ -1,0 +1,6 @@
+= Introduction =
+
+Centreon (and Nagios) configuration for the otrs-ticket.pl script.
+
+= Details =
+
