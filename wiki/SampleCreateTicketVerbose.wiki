@@ -1,4 +1,3 @@
-#labels Featured
 = Introduction =
 
 An example screen output when creating an OTRS ticket with the --verbose command-line argument.
