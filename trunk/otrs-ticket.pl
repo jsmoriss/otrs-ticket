@@ -1,6 +1,12 @@
 #!/usr/bin/perl -Tw
 
-# Copyright 2012 Jean-Sebastien Morisset (http://surniaulula.com/).
+# Copyright 2012 - Jean-Sebastien Morisset - http://surniaulula.com/
+#
+# Create and update OTRS tickets from Centreon, Nagios, other monitoring tools,
+# or the command-line.
+#
+#   Blog Page: http://surniaulula.com/2012/10/24/create-and-update-otrs-tickets-from-the-command-line/
+# Google Code: https://code.google.com/p/otrs-ticket/
 #
 # This script is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -11,26 +17,27 @@
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
 # details at http://www.gnu.org/licenses/.
-
-# Create and update OTRS tickets from Centreon, Nagios, other monitoring
-# systems, or the command-line.
 #
 # Centreon / Nagios Host Notification:
+#
 #	$USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --problem_id="$HOSTPROBLEMID$" --problem_id_last="$LASTHOSTPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTNAME$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEACKAUTHOR$ $SERVICEACKCOMMENT$" --event_state="$HOSTSTATE$" --event_output="$HOSTOUTPUT$"
 #
 # Centreon / Nagios Service Notification:
+#
 #	 $USER1$/otrs-ticket.pl --otrs_user="user" --otrs_pass="pass" --otrs_server="server.domain.com:80" --problem_id="$SERVICEPROBLEMID$" --problem_id_last="$LASTSERVICEPROBLEMID$" --event_type="$NOTIFICATIONTYPE$" --event_date="$LONGDATETIME$" --event_host="$HOSTALIAS$" --event_addr="$HOSTADDRESS$" --event_desc="$SERVICEDESC$" --event_state="$SERVICESTATE$" --event_output="$SERVICEOUTPUT$"
 #
 # Requirements for OTRS:
 #
-# 1) The GenericTicketConnector.yml must be installed.
-# 1) A user name and password to create tickets.
-# 2) A UNIX ticket queue (see %otrs_defaults variable).
-# 3) An 'unknown' customer username (see %otrs_defaults variable).
-# 4) A state named 'recovered' (see %otrs_states variable).
-# 5) An 'Infrastructure::Server::Unix/Linux' service (see %otrs_defaults variable).
+# 1) The GenericTicketConnector.yml must be installed
+#    (http://source.otrs.org/viewvc.cgi/otrs/development/webservices/GenericTicketConnector.yml?view=co)
+# 1) A user name (aka "Agent") and password to for the script
+# 2) A ticket queue (defaults to "UNIX" -- see the %otrs_defaults variable)
+# 3) An 'unknown' customer username (see the %otrs_defaults variable)
+# 5) An 'Infrastructure::Server::Unix/Linux' OTRS Service (see the
+#    %otrs_defaults variable).
+# 4) An OTRS State named 'recovered' (see the %otrs_states variable).
 # 6) Dynamic fields ProblemID, HostName, HostAddress, and ServiceDesc.
-#
+
 use strict;
 use Socket;
 use Getopt::Long;
@@ -78,6 +85,8 @@ GetOptions(\%opt, 'verbose', 'otrs_user=s', 'otrs_pass=s', 'otrs_server=s',
 for ( qw( problem_id problem_id_last ) ) { 
 	$opt{$_} =~ s/[^0-9]// if (defined $opt{$_});
 }
+# clear "empty" event_desc from host notification
+$opt{'event_desc'} =~ s/^\$ \$$//;
 
 # beautify some option names for logging, ticket text, etc.
 my %event_info = (
@@ -255,7 +264,9 @@ if ($TicketID) {
 $ticket{'CustomerUser'} = $opt{'otrs_customer'} ||= $otrs_defaults{'CustomerUser'};
 $ticket{'ContentType'} = 'text/plain; charset=utf8';
 $ticket{'SenderType'} = 'system';
-$ticket{'Title'} = "$opt{'event_type'}: $opt{'event_host'}/$opt{'event_desc'} is $opt{'event_state'}";
+$ticket{'Title'} = $opt{'event_type'}.': '.$opt{'event_host'};
+$ticket{'Title'} .= '/'.$opt{'event_desc'} if ($opt{'event_desc'});
+$ticket{'Title'} .= ' is '.$opt{'event_state'};
 $ticket{'Subject'} = $ticket{'Title'};
 $ticket{'Body'} = $opt{'event_output'}."\n\n";
 
