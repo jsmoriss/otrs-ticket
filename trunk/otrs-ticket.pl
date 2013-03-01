@@ -38,6 +38,22 @@
 # 4) An OTRS State named 'recovered' (see the %otrs_states variable).
 # 6) Dynamic fields ProblemID, HostName, HostAddress, and ServiceDesc.
 
+# Changes:
+#
+# v1.2.1:
+# - Modified the 'open()' function for the CSV file to use a proper variable name.
+# - Passed the script through perlcritic to make sure all syntax is OK.
+#
+# v1.2
+# - Renamed the event_id and event_id_last options to problem_id and problem_id_last.
+# - Added %otrs_states to change ticket state depending on the event_type value.
+# 
+# v1.1
+# - Added inet_aton/inet_ntoa function calls to resolve OTRS server IP before launching SOAP (just to make sure the resolver works).
+# - Added --notif_id and --notif_number command line argument.
+# - Renamed Nagios *EVENTID variables to *PROBLEMID.
+
+
 use strict;
 use Socket;
 use Getopt::Long;
@@ -46,7 +62,7 @@ use DBD::SQLite;
 use SOAP::Lite;
 use Log::Handler;
 
-my $VERSION = '1.2';
+my $VERSION = '1.2.1';
 
 # hard-code paths to prevent warning from taint mode
 my $logfile = '/var/tmp/otrs-ticket.log';
@@ -135,10 +151,10 @@ $log->info("START of $0 v$VERSION script");
 # arguments might be missing).
 #
 $log->debug("Saving event_info fields to $csvfile.");
-unless (open (CSV, ">>$csvfile")) { $log->critical("Error opening ".$csvfile.": ".$!); &DoExit(1); }
-unless (-s $csvfile) { for (sort keys %event_info) { print CSV '"', $_, '",'; }; print CSV "\n"; }
-for (sort keys %event_info) { print CSV '"', $event_info{$_}, '",'; }; print CSV "\n";
-close (CSV);
+unless (open (my $csv_fh, ">>", $csvfile)) { $log->critical("Error opening ".$csvfile.": ".$!); &DoExit(1); }
+unless (-s $csvfile) { for (sort keys %event_info) { print $csv_fh '"', $_, '",'; }; print $csv_fh "\n"; }
+for (sort keys %event_info) { print $csv_fh '"', $event_info{$_}, '",'; }; print $csv_fh "\n";
+close ($csv_fh);
 
 #
 # Check all essential opt values and exit if some missing.
